@@ -13,7 +13,6 @@ connector = mysql.connector.connect(
 cursor = connector.cursor()
 random_query = "SELECT * FROM projects WHERE status IS NULL ORDER BY RAND(%s) LIMIT %s OFFSET %s"
 add_query = "INSERT INTO projects (title, description) VALUES (%s, %s)"
-ret =
 def get(num=1, seed=None, page=0):
     if seed is None:
         seed = randint(0, 100000)
@@ -24,7 +23,7 @@ def confirm(action):
     try:
         if input(f"\nAre you sure you want to {action}? [Y]es or ^C to confirm: ").lower()[0] == 'y':
             return True
-    except KeyboardInterrupt:ret =
+    except KeyboardInterrupt:
         print()
         return True
     except IndexError:
@@ -41,37 +40,51 @@ def random(num=1):
     for project in list:
         print_project(project) 
 
+def rate(id, rating):
+    cursor.execute("INSERT INTO ratings (project_id, rating) VALUES (%s, %s)", (id, rating))
+    connector.commit()
+
 def queue(num=10):
     # Want to replace with better algorithm than completely random
     list = get(num, randint(0, 100000), 0)
     for i, project in enumerate(list):
+        print("---------------------------------------------------")
         print(f"Project {i+1} of {num}")
+        print("---------------------------------------------------")
         print(f"Title: {project[1]}")
         print(f"Description: {project[2]}")
-        print("-----------------------------------------")
-        print("Commands: [S]ave, [D]elete, [Next], [Quit]")
-        # TODO add functionality to save delete and quit
-        # if opt[0] == 's':
-        #
+        print("---------------------------------------------------")
+        print("Enter a rating (1-9) or [S]kip, [D]elete, [Q]uit")
+        print("---------------------------------------------------")
         while True:
-            opt = input("Enter an option: ")
-            if opt[0] == 's':
-                pass
-            elif opt[0] == 'd':
-                if confirm(f"delete {project[1]}"):
-                    delete(project[0])
-            elif opt[0] == 'q':
-                if confirm("leave queue:"):
+            try:
+                opt = input("Enter an option: ").lower()[0]
+                if opt == 's':
+                    break
+                elif opt == 'd':
+                    if confirm(f"delete {project[1]}"):
+                        delete(project[0])
+                        break
+                elif opt == 'q':
+                    raise KeyboardInterrupt
+                elif opt.isdigit() and int(opt) > 0:
+                    rate(project[0], opt)
+                    break
+                else:
+                    print("Invalid input")
+            except KeyboardInterrupt:
+                if confirm("leave queue"):
                     return
                 continue
-            break
-            
-
 def add():
-    name = input("Project name: ")
-    desc = input("Project description: ")
-    cursor.execute(add_query, (name, desc))
-    connector.commit()
+    try:
+        name = input("Project name: ")
+        desc = input("Project description: ")
+        cursor.execute(add_query, (name, desc))
+        connector.commit()
+    except KeyboardInterrupt:
+        print()
+        return
 
 def help():
     print("Options:")

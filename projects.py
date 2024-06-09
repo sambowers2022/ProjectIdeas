@@ -1,23 +1,7 @@
-import mysql.connector
 from random import randint
-import os
-from dotenv import load_dotenv 
+import database 
 
-load_dotenv()
-connector = mysql.connector.connect(
-    user=os.getenv("DB_USER"),
-    password=os.getenv("DB_PWD"),
-    host='localhost',
-    database='projects'
-)
-cursor = connector.cursor()
-random_query = "SELECT * FROM projects WHERE status IS NULL ORDER BY RAND(%s) LIMIT %s OFFSET %s"
-add_query = "INSERT INTO projects (title, description) VALUES (%s, %s)"
-def get(num=1, seed=None, page=0):
-    if seed is None:
-        seed = randint(0, 100000)
-    cursor.execute(random_query, (seed,num,page*num))
-    return cursor.fetchall()
+db = database.DataBase()
 
 def confirm(action):
     try:
@@ -30,45 +14,45 @@ def confirm(action):
         pass
     return False
 
-def print_project(project):
-    print(f"Title: {project[1]}")
-    print(f"Description: {project[2]}")
-    print()
+def print_list(list, fields=None):
+    if fields is None:
+        fields = list[0].keys()
+    for item in list:
+        for field in fields:
+            print(f"{field}: " + str(item[field]))
+
 
 def random(num=1):
-    list = get(num) 
-    for project in list:
-        print_project(project) 
+    list = db.get_random(num) 
+    print_list(list, ["title"])
 
-def rate(id, rating):
-    cursor.execute("INSERT INTO ratings (project_id, rating) VALUES (%s, %s)", (id, rating))
-    connector.commit()
 
 def queue(num=10):
     # Want to replace with better algorithm than completely random
-    list = get(num, randint(0, 100000), 0)
+    list = db.get_random(num, randint(0, 100000), 0)
     for i, project in enumerate(list):
         print("---------------------------------------------------")
         print(f"Project {i+1} of {num}")
-        print("---------------------------------------------------")
-        print(f"Title: {project[1]}")
-        print(f"Description: {project[2]}")
+        print()
+        print(project)
+        print()
         print("---------------------------------------------------")
         print("Enter a rating (1-9) or [S]kip, [D]elete, [Q]uit")
-        print("---------------------------------------------------")
         while True:
             try:
                 opt = input("Enter an option: ").lower()[0]
                 if opt == 's':
                     break
                 elif opt == 'd':
-                    if confirm(f"delete {project[1]}"):
-                        delete(project[0])
+                    if confirm(f"delete {project['title']}"):
+                        db.delete(project['title'])
                         break
                 elif opt == 'q':
                     raise KeyboardInterrupt
+                elif opt == 'l':
+                    print()
                 elif opt.isdigit() and int(opt) > 0:
-                    rate(project[0], opt)
+                    db.rate(project['id'], opt)
                     break
                 else:
                     print("Invalid input")
@@ -76,11 +60,14 @@ def queue(num=10):
                 if confirm("leave queue"):
                     return
                 continue
+            except:
+                print("Invalid input")
+        print("\n")
+
 def add():
     try:
         name = input("Project name: ")
-        desc = input("Project description: ")
-        cursor.execute(add_query, (name, desc))
+        cursor.execute(add_query, (name,))
         connector.commit()
     except KeyboardInterrupt:
         print()
@@ -90,30 +77,35 @@ def help():
     print("Options:")
     print("[A]dd a new project")
     print("[R]andomly select a project")
-    print("[S]earch for a project")
-    print("[Q]uit")
+    print("[Q]ueue")
     print()
 
 def input_loop(leaving=False):
     try:
         args = str(input("Choose an option (? for help): ")).lower().split(' ')
-        if args[0][0] == '?':
+        opt = args[0][0]
+        if opt == '?':
             help()
-        elif args[0][0] == 'a':
+        elif opt == 'a':
             add()
-        elif args[0][0] == 'q':
+        elif opt == 'q':
             queue()
-        elif args[0][0] == 'r':
+        elif opt == 'r':
             if len(args) > 1: 
                 random(int(args[1]))
             else:
                 random()
-        input_loop()
+        else:
+            raise Exception
     except KeyboardInterrupt:
         if confirm("exit") is True:
-            connector.close()
             print("Closing...")
+            db.close()
+            print("Closed")
             exit(0)
-        input_loop()
+    except Exception as e:
+        print(e)
+        print("Invalid input")
+    input_loop()
      
 input_loop()

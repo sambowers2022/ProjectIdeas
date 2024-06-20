@@ -2,12 +2,14 @@ import mysql.connector
 import os
 from dotenv import load_dotenv 
 from random import randint
- 
+import datetime 
+
 # Query templates
 random_query = "SELECT * FROM projects WHERE status IS NULL ORDER BY RAND(%s) LIMIT %s OFFSET %s"
 add_query = "INSERT INTO projects (title) VALUES (%s)"
 list_query = "select title, avg(rating) as avg,count(*) as num from ratings join projects on project_id=projects.id group by projects.id order by avg desc, num desc LIMIT %s OFFSET %s"
 rate_query = "INSERT INTO ratings (project_id, rating) VALUES (%s, %s)"
+delete_query = ""
 
 class DataBase:
     connector = None
